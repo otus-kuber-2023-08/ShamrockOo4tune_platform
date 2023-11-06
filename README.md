@@ -14,7 +14,7 @@ ShamrockOo4tune Platform repository
 |07|9      |Custom Resource Definitions. Operators                                       |[в другом потоке](https://github.com/otus-kuber-2023-04/ShamrockOo4tune_platform/pull/18)|  
 |08|10     |Мониторинг компонентов кластера и приложений, работающих в нем               |[в другом потоке](https://github.com/otus-kuber-2023-04/ShamrockOo4tune_platform/pull/17)|  
 |09|11     |Сервисы централизованного логирования для компонентов Kubernetes и приложений|[kubernetes-logging](./documentation/09_11_kubernetes_logging.MD)                        |  
-|10|15     |GitOps и инструменты поставки                                                |[в другом потоке](https://github.com/otus-kuber-2023-04/ShamrockOo4tune_platform/pull/20)|  
+|10|15     |GitOps и инструменты поставки                                                |[kubernetes-gitops](./documentation/10_15_kubernetes_gitops.MD)                          |  
 |11|19     |Хранилище секретов для приложений. Vault                                     |[в другом потоке](https://github.com/otus-kuber-2023-04/ShamrockOo4tune_platform/pull/21)|  
 |12|23     |CSI. Обзор подсистем хранения данных в Kubernetes                            |  
 |13|24     |Диагностика и отладка кластера и приложений в нем                            |
