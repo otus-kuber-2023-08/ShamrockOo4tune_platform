@@ -1,0 +1,113 @@
+prometheus:
+  prometheusSpec:
+    tolerations:
+    - key: node-role
+      operator: Equal
+      value: infra
+      effect: NoSchedule
+
+    nodeSelector:
+      pool: infra
+
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+  ingress:
+    enabled: true
+    annotations: {}
+#      kubernetes.io/tls-acme: "true"
+#      cert-manager.io/cluster-issuer: "letsencrypt-production"
+#      cert-manager.io/acme-challenge-type: http01
+    ingressClassName: nginx
+    hosts:
+      - prometheus.sgumerov.site
+    paths:
+      - /
+#    tls:
+#      - secretName: prometheus.sgumerov.site-tls
+#        hosts:
+#          - prometheus.sgumerov.site
+
+prometheusOperator:
+  tolerations:
+    - key: node-role
+      operator: Equal
+      value: infra
+      effect: NoSchedule
+  nodeSelector:
+    pool: infra
+
+prometheus-node-exporter:
+  tolerations:
+    - key: node-role
+      operator: Equal
+      value: infra
+      effect: NoSchedule
+  nodeSelector:
+    pool: infra
+
+kube-state-metrics:
+  tolerations:
+    - key: node-role
+      operator: Equal
+      value: infra
+      effect: NoSchedule
+  nodeSelector:
+    pool: infra
+
+alertmanager:
+  alertmanagerSpec:
+    tolerations:
+      - key: node-role
+        operator: Equal
+        value: infra
+        effect: NoSchedule
+    nodeSelector:
+      pool: infra
+  ingress:
+    enabled: true
+    annotations: {}
+      #kubernetes.io/tls-acme: "true"
+      #cert-manager.io/cluster-issuer: "letsencrypt-production"
+      #cert-manager.io/acme-challenge-type: http01
+    ingressClassName: nginx
+    hosts:
+      - alertmanager.sgumerov.site
+    paths:
+      - /
+    #tls:
+    #  - secretName: alertmanager.kuber.kochego.online
+    #    hosts:
+    #      - alertmanager.sgumerov.site
+
+grafana:
+  tolerations:
+    - key: node-role
+      operator: Equal
+      value: infra
+      effect: NoSchedule
+  nodeSelector:
+    pool: infra
+  enabled: true
+  defaultDashboardsEnabled: true
+  adminPassword: ytnybr
+  ingress:
+    enabled: true
+    annotations: {}
+      #kubernetes.io/tls-acme: "true"
+      #cert-manager.io/cluster-issuer: "letsencrypt-production"
+      #cert-manager.io/acme-challenge-type: http01
+    ingressClassName: nginx
+    hosts:
+      - grafana.sgumerov.site
+    path: /
+    #tls:
+    #  - secretName: grafana.sgumerov.site-tls
+    #    hosts:
+    #      - grafana.sgumerov.site
+    additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki:3100
+      jsonData:
+        maxLines: 1000
