@@ -1,0 +1,7 @@
+apiVersion: "app.example.com/v1alpha1"
+kind: "Netperf"
+metadata:
+  name: "example"
+spec:
+  serverNode: "cl1s4e1jecuagr8esj8q-azow"
+  clientNode: "cl1ue7u54tr5hacuhivf-iwid"
