@@ -18,7 +18,8 @@ ShamrockOo4tune Platform repository
 |11|19     |Хранилище секретов для приложений. Vault                                     |[в другом потоке](https://github.com/otus-kuber-2023-04/ShamrockOo4tune_platform/pull/21)|  
 |12|23     |CSI. Обзор подсистем хранения данных в Kubernetes                            |[kubernetes-storage](./documentation/12_23_kubernetes_storage.MD)                        |  
 |13|24     |Диагностика и отладка кластера и приложений в нем                            |[kubernetes-debug](./documentation/13_24_kubernetes_debug.MD)                            |  
-|14|25     |Подходы к развертыванию и обновлению production-grade кластера               |  
-|15|27     |Курсовой проект                                                              |[kubernetes-project](./documentation/15_27_kubernetes_project.MD)                        |  
+|14|25     |Подходы к развертыванию и обновлению production-grade кластера               |[kubernetes-prod](./documentation/14_25_kubernetes_prod.MD)                              |  
+|15|26     |Выбор темы и организация проектной работы                                    |[kubernetes-project-selection](./documentation/15_26_kubernetes_project_selection.MD)    |  
+|16|27     |Курсовой проект                                                              |[kubernetes-project](./documentation/15_27_kubernetes_project.MD)                        |  
 
 <br>  
