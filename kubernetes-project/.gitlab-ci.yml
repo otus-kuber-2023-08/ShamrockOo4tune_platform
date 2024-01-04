@@ -1,0 +1,147 @@
+image:
+  name: registry.gitlab.com/gitlab-org/gitlab-build-images:terraform
+  entrypoint:
+    - '/usr/bin/env'
+    - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
+cache:
+  paths:
+    - .terraform
+
+variables:
+  YC_SERVICE_ACCOUNT_KEY_FILE: "/home/anduser/yc-terraform/key.json"
+
+stages: 
+  - infrastructure_provisioning 
+  - bastion_configuration
+  - generate-inventory
+  - deploy
+  
+before_script:
+  - apk add gnupg
+  - mkdir -p /home/anduser/yc-terraform
+  - cat $YC_KEY > /home/anduser/yc-terraform/key.json
+  - cd ./kubernetes-project/terraform
+  - cat $TFVARS > terraform.tfvars
+  - |
+    cat <<EOF >> ~/.terraformrc
+    provider_installation {
+      network_mirror {
+        url = "https://terraform-mirror.yandexcloud.net/"
+        include = ["registry.terraform.io/*/*"]
+      }
+      direct {
+        exclude = ["registry.terraform.io/*/*"]
+      }
+    }
+    EOF
+  - terraform init -reconfigure
+
+validate_and_plan:
+  stage: infrastructure_provisioning
+  script: 
+    - terraform validate
+    - terraform plan -out="planfile"
+  after_script:
+    - gpg --symmetric --batch --yes --passphrase $ARTIFACT_ENCRYPTION_PASSPHRASE -o ./kubernetes-project/terraform/planfile.gpg  -c ./kubernetes-project/terraform/planfile
+  artifacts:
+    paths:
+      - kubernetes-project/terraform/planfile.gpg
+    expire_in: 1800 seconds
+
+apply:
+  stage: infrastructure_provisioning    
+  needs:
+    - job: validate_and_plan
+      artifacts: true
+  script:
+    - echo $ARTIFACT_ENCRYPTION_PASSPHRASE | gpg --batch --always-trust --yes --passphrase-fd 0 -d -o planfile planfile.gpg
+    - terraform apply -auto-approve "planfile"
+    - terraform output -json > outputs.json 
+  when: manual
+  after_script:
+    - gpg --symmetric --batch --yes --passphrase $ARTIFACT_ENCRYPTION_PASSPHRASE -o ./kubernetes-project/terraform/ansible_rsa.gpg  -c ./kubernetes-project/terraform/ansible_rsa
+    - gpg --symmetric --batch --yes --passphrase $ARTIFACT_ENCRYPTION_PASSPHRASE -o ./kubernetes-project/terraform/outputs.json.gpg -c ./kubernetes-project/terraform/outputs.json
+  artifacts:
+    paths:
+      - kubernetes-project/terraform/ansible_rsa.gpg
+      - kubernetes-project/terraform/outputs.json.gpg
+    expire_in: 1800 seconds
+
+configure-bastion:
+  stage: bastion_configuration
+  image: alpine
+  needs:
+    - job: apply
+      artifacts: true
+  before_script:
+    - cd ./kubernetes-project/terraform
+    - apk update; apk add gnupg jq openssh
+    - echo $ARTIFACT_ENCRYPTION_PASSPHRASE | gpg --batch --always-trust --yes --passphrase-fd 0 -d -o ansible_rsa ansible_rsa.gpg
+    - echo $ARTIFACT_ENCRYPTION_PASSPHRASE | gpg --batch --always-trust --yes --passphrase-fd 0 -d -o outputs.json outputs.json.gpg
+    - chmod 0400 ansible_rsa
+  script:
+    - export BASTION_IP=$(cat outputs.json | jq -r .bastion_public_ip.value)
+    - scp    -o "StrictHostKeyChecking no" -i ansible_rsa ansible_rsa  ansible@$BASTION_IP:/home/ansible/.ssh/id_rsa 
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "sudo apt-get -y update && sudo apt-get -y install software-properties-common gnupg2 git curl"
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "sudo add-apt-repository -y ppa:deadsnakes/ppa"
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "sudo DEBIAN_FRONTEND=noninteractive apt-get -y install python3.11"
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 2 && sudo update-alternatives --config python3"
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && sudo python3 get-pip.py; sudo pip install virtualenv"
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "sudo ln -s /usr/lib/python3/dist-packages/apt_pkg.cpython-38-x86_64-linux-gnu.so /usr/lib/python3/dist-packages/apt_pkg.so"
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "sudo ln -s /usr/lib/python3/dist-packages/apt_inst.cpython-38-x86_64-linux-gnu.so /usr/lib/python3/dist-packages/apt_inst.so"
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "git clone https://github.com/kubernetes-sigs/kubespray.git; cd kubespray; sudo pip install -r requirements.txt && ansible --version"
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "git clone https://github.com/ceph/ceph-ansible.git; cd ceph-ansible; git checkout stable-7.0; sudo virtualenv ../ceph-ansible; source bin/activate; sudo pip uninstall -y setuptools && sudo pip install setuptools; sudo pip install -r requirements.txt; sudo ansible-galaxy install -r requirements.yml"
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "mkdir -p /home/ansible/ansible; touch /home/ansible/ansible/ansible.log"
+    - echo "BASTION @ $BASTION_IP is now configured to run playbooks with ansible"
+  
+generate-inventory:
+  stage: generate-inventory
+  image: alpine
+  needs:
+    - job: configure-bastion
+    - job: apply
+      artifacts: true
+  before_script:
+    - cd ./kubernetes-project
+    - apk update; apk add gnupg jq openssh
+    - echo $ARTIFACT_ENCRYPTION_PASSPHRASE | gpg --batch --always-trust --yes --passphrase-fd 0 -d -o ansible_rsa  ./terraform/ansible_rsa.gpg
+    - echo $ARTIFACT_ENCRYPTION_PASSPHRASE | gpg --batch --always-trust --yes --passphrase-fd 0 -d -o outputs.json ./terraform/outputs.json.gpg
+    - chmod 0400 ansible_rsa
+  script:
+    - export BASTION_IP=$(cat outputs.json | jq -r .bastion_public_ip.value)
+    - for i in 1 2 3 ; do sed -i "s/ceph${i}_ip/$(cat outputs.json | jq -r .ceph${i}_private_ip.value)/" ceph/inventory.ini ; done
+    - scp    -o "StrictHostKeyChecking no" -i ansible_rsa ceph/inventory.ini ansible@$BASTION_IP:/home/ansible/ceph-ansible/inventory.ini
+    - scp    -o "StrictHostKeyChecking no" -i ansible_rsa ceph/site.yml      ansible@$BASTION_IP:/home/ansible/ceph-ansible/site.yml
+    - scp    -o "StrictHostKeyChecking no" -i ansible_rsa ceph/all.yml       ansible@$BASTION_IP:/home/ansible/ceph-ansible/group_vars/all.yml
+    - scp    -o "StrictHostKeyChecking no" -i ansible_rsa ceph/osds.yml      ansible@$BASTION_IP:/home/ansible/ceph-ansible/group_vars/osds.yml
+    
+deploy-ceph:
+  stage: deploy
+  image: alpine
+  needs:
+    - job: generate-inventory
+    - job: apply
+      artifacts: true
+  before_script:
+    - cd ./kubernetes-project
+    - apk update; apk add gnupg jq openssh
+    - echo $ARTIFACT_ENCRYPTION_PASSPHRASE | gpg --batch --always-trust --yes --passphrase-fd 0 -d -o ansible_rsa  ./terraform/ansible_rsa.gpg
+    - echo $ARTIFACT_ENCRYPTION_PASSPHRASE | gpg --batch --always-trust --yes --passphrase-fd 0 -d -o outputs.json ./terraform/outputs.json.gpg
+    - chmod 0400 ansible_rsa
+  script:
+    - export BASTION_IP=$(cat outputs.json | jq -r .bastion_public_ip.value)
+    - export CEPH1_IP=$(cat outputs.json | jq -r .ceph1_private_ip.value)
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "cd /home/ansible/ceph-ansible; source bin/activate; sudo ansible-playbook -i inventory.ini ./site.yml"
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh -o 'StrictHostKeyChecking no' $CEPH1_IP 'sudo ceph config set mon auth_allow_insecure_global_id_reclaim false'"
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh -o 'StrictHostKeyChecking no' $CEPH1_IP 'sudo ceph osd pool create kube 8 8; sudo ceph auth add client.kube mon allow\ r osd allow\ rwx\ pool=kube'"
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh -o 'StrictHostKeyChecking no' $CEPH1_IP 'sudo ceph auth get-key client.kube'" > client.key
+    - ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh -o 'StrictHostKeyChecking no' $CEPH1_IP 'sudo ceph auth get client.admin'" | grep 'key = ' | awk '{print $3}' > admin.key
+  after_script:
+    - gpg --symmetric --batch --yes --passphrase $ARTIFACT_ENCRYPTION_PASSPHRASE -o ./kubernetes-project/client.key.gpg -c ./kubernetes-project/client.key
+    - gpg --symmetric --batch --yes --passphrase $ARTIFACT_ENCRYPTION_PASSPHRASE -o ./kubernetes-project/admin.key.gpg  -c ./kubernetes-project/admin.key
+  artifacts:
+    paths:
+      - kubernetes-project/admin.key.gpg
+      - kubernetes-project/client.key.gpg
+    expire_in: 1800 seconds

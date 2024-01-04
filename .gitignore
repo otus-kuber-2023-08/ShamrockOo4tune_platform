@@ -1,16 +1,20 @@
 # 3rd party projects and repos
 kubernetes-logging/v8.5.1.tar.gz
 kubernetes-logging/helm-charts-8.5.1
+ceph-ansible/
 
 # sensitive and unnecessary terraform files
 .terraform
 terraform.tfstate
 terraform.tfstate.backup
 outputs.json
+outputs.json.gpg
+terraform-outputs.json
 terraform.tfvars
 .terraform.lock.hcl
 
 # ansible sensitive dynamically generated files
-kubernetes-project/ansible/ansible_rsa
-kubernetes-project/ansible/ansible_rsa.pub
+ansible_rsa
+ansible_rsa.pub
+ansible_rsa.gpg
 kubernetes-project/ansible

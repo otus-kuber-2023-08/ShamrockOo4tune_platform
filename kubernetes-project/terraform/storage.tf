@@ -1,89 +1,170 @@
-resource "yandex_compute_instance_group" "ceph-cluster" {
-  name               = "ceph-cluster"
-  service_account_id = yandex_iam_service_account.admin.id
+# Не нашел возможности задавать динамически количество и достигать нужного мне
+# результата. Реализации с вариациями count/for each/compute_instance_group меня
+# не удовлетворяют своим несоответствующим моим задумкам результатом, поэтому,
+# ХОЧУ и БУДУ использовать не DRY подход. 
+# Основное разочарование связано с тем что при создании compute_instance_group,
+# т.е. - основной вариант который должен был бы обеспечить мою потребность,
+# у создаваемых инстансов корневой раздел "/" монтируется вовсе не на 
+# загрузочный hdd диск, а на случайный sdd. И очистить их разделы потом, для 
+# передачи в OSD автоматизированным способом не получается без изобретения 
+# сложных и кривых костылей, которые требуют экспертных знаний в области работы 
+# с дисками и фс
 
-  instance_template {
-    platform_id = "standard-v2"
-    name        = "ceph{instance.index}"
-    hostname    = "ceph{instance.index}"
+resource "yandex_compute_disk" "ssd_for_ceph1" {
+  count     = 3
+  folder_id = var.folder_id
+  name      = "ssd-1-${count.index + 1}"
+  type      = "network-ssd"
+  zone      = "ru-central1-a"
+  size      = 15
+}
 
-    resources {
-      cores         = 2
-      memory        = 4 * 2 //each osd will need 4GiB, but tariff plan allows max 8Gib for 20% CPU instabce
-      core_fraction = 20
-    }
+resource "yandex_compute_disk" "ssd_for_ceph2" {
+  count     = 3
+  folder_id = var.folder_id
+  name      = "ssd-2-${count.index + 1}"
+  type      = "network-ssd"
+  zone      = "ru-central1-b"
+  size      = 15
+}
 
-    boot_disk {
-      initialize_params {
-        image_id = var.image_id_storages
-        size     = 20
-      }
-    }
+resource "yandex_compute_disk" "ssd_for_ceph3" {
+  count     = 3
+  folder_id = var.folder_id
+  name      = "ssd-3-${count.index + 1}"
+  type      = "network-ssd"
+  zone      = "ru-central1-d"
+  size      = 15
+}
 
-    secondary_disk {
-      name = "sdd{instance.index}1"
-      initialize_params {
-        image_id = var.image_id_storages
-        size     = 15
-        type     = "network-ssd"
-      }
-    }
+resource "yandex_compute_instance" "ceph1" {
+  folder_id                 = var.folder_id
+  name                      = "ceph1"
+  hostname                  = "ceph1"
+  allow_stopping_for_update = true
+  platform_id               = "standard-v2"
+  zone                      = "ru-central1-a"
 
-    secondary_disk {
-      name = "sdd{instance.index}2"
-      initialize_params {
-        image_id = var.image_id_storages
-        size     = 15
-        type     = "network-ssd"
-      }
-    }
+  resources {
+    cores         = 2
+    memory        = 4 * 2 //each osd will need 4GiB, but tariff plan allows max 8Gib for 20% CPU instabce
+    core_fraction = 20
+  }
 
-    secondary_disk {
-      name = "sdd{instance.index}3"
-      initialize_params {
-        image_id = var.image_id_storages
-        size     = 15
-        type     = "network-ssd"
-      }
-    }
-
-    network_interface {
-      network_id = yandex_vpc_network.platform.id
-      subnet_ids = [
-        yandex_vpc_subnet.platform-subnet-1.id,
-        yandex_vpc_subnet.platform-subnet-2.id,
-        yandex_vpc_subnet.platform-subnet-3.id,
-      ]
-      nat = false
-      //ip_address = "192.168.{instance.index}0.30"
-    }
-
-    # metadata = {
-    #   ssh-keys = "ubuntu:${file(var.ssh_private_key_path)}"
-    # }
-    metadata = {
-      user-data : "#cloud-config\nusers:\n  - name: ansible\n    groups: sudo\n    shell: /bin/bash\n    sudo: ['ALL=(ALL) NOPASSWD:ALL']\n    ssh-authorized-keys:\n      - ${tls_private_key.ssh_key.public_key_openssh}"
+  boot_disk {
+    initialize_params {
+      image_id = var.image_id
+      size     = 20
     }
   }
 
-  scale_policy {
-    fixed_scale {
-      size = var.ceph_count
+  secondary_disk {
+    disk_id = yandex_compute_disk.ssd_for_ceph1[0].id
+  }
+
+  secondary_disk {
+    disk_id = yandex_compute_disk.ssd_for_ceph1[1].id
+  }
+
+  secondary_disk {
+    disk_id = yandex_compute_disk.ssd_for_ceph1[2].id
+  }
+
+  network_interface {
+    subnet_id = yandex_vpc_subnet.platform-subnet-1.id
+    nat       = false
+    ipv6      = false
+  }
+
+  metadata = {
+    user-data : "#cloud-config\nusers:\n  - name: ansible\n    groups: sudo\n    shell: /bin/bash\n    sudo: ['ALL=(ALL) NOPASSWD:ALL']\n    ssh-authorized-keys:\n      - ${tls_private_key.ssh_key.public_key_openssh}"
+  }
+}
+
+resource "yandex_compute_instance" "ceph2" {
+  folder_id                 = var.folder_id
+  name                      = "ceph2"
+  hostname                  = "ceph2"
+  allow_stopping_for_update = true
+  platform_id               = "standard-v2"
+  zone                      = "ru-central1-b"
+
+  resources {
+    cores         = 2
+    memory        = 4 * 2 //each osd will need 4GiB, but tariff plan allows max 8Gib for 20% CPU instabce
+    core_fraction = 20
+  }
+
+  boot_disk {
+    initialize_params {
+      image_id = var.image_id
+      size     = 20
     }
   }
 
-  allocation_policy {
-    zones = [
-      "ru-central1-a",
-      "ru-central1-b",
-      "ru-central1-d",
-    ]
+  secondary_disk {
+    disk_id = yandex_compute_disk.ssd_for_ceph2[0].id
   }
 
-  deploy_policy {
-    max_unavailable = 3
-    max_creating    = 3
-    max_expansion   = 3
-    max_deleting    = 3
+  secondary_disk {
+    disk_id = yandex_compute_disk.ssd_for_ceph2[1].id
+  }
+
+  secondary_disk {
+    disk_id = yandex_compute_disk.ssd_for_ceph2[2].id
+  }
+
+  network_interface {
+    subnet_id = yandex_vpc_subnet.platform-subnet-2.id
+    nat       = false
+    ipv6      = false
+  }
+
+  metadata = {
+    user-data : "#cloud-config\nusers:\n  - name: ansible\n    groups: sudo\n    shell: /bin/bash\n    sudo: ['ALL=(ALL) NOPASSWD:ALL']\n    ssh-authorized-keys:\n      - ${tls_private_key.ssh_key.public_key_openssh}"
+  }
+}
+
+resource "yandex_compute_instance" "ceph3" {
+  folder_id                 = var.folder_id
+  name                      = "ceph3"
+  hostname                  = "ceph3"
+  allow_stopping_for_update = true
+  platform_id               = "standard-v2"
+  zone                      = "ru-central1-d"
+
+  resources {
+    cores         = 2
+    memory        = 4 * 2 //each osd will need 4GiB, but tariff plan allows max 8Gib for 20% CPU instabce
+    core_fraction = 20
+  }
+
+  boot_disk {
+    initialize_params {
+      image_id = var.image_id
+      size     = 20
+    }
+  }
+
+  secondary_disk {
+    disk_id = yandex_compute_disk.ssd_for_ceph3[0].id
+  }
+
+  secondary_disk {
+    disk_id = yandex_compute_disk.ssd_for_ceph3[1].id
+  }
+
+  secondary_disk {
+    disk_id = yandex_compute_disk.ssd_for_ceph3[2].id
+  }
+
+  network_interface {
+    subnet_id = yandex_vpc_subnet.platform-subnet-3.id
+    nat       = false
+    ipv6      = false
+  }
+
+  metadata = {
+    user-data : "#cloud-config\nusers:\n  - name: ansible\n    groups: sudo\n    shell: /bin/bash\n    sudo: ['ALL=(ALL) NOPASSWD:ALL']\n    ssh-authorized-keys:\n      - ${tls_private_key.ssh_key.public_key_openssh}"
   }
 }

@@ -44,14 +44,26 @@ output "public_key" {
   sensitive = false
 }
 
-output "ceph_count" {
-  value = var.ceph_count
+output "ceph1_hostname" {
+  value = yandex_compute_instance.ceph1.fqdn
 }
 
-output "storage_nodes_hostnames" {
-  value = yandex_compute_instance_group.ceph-cluster.instances.*.fqdn
+output "ceph1_private_ip" {
+  value = yandex_compute_instance.ceph1.network_interface[0].ip_address
 }
 
-output "storage_nodes_private_ips" {
-  value = yandex_compute_instance_group.ceph-cluster.instances.*.network_interface.0.ip_address
+output "ceph2_hostname" {
+  value = yandex_compute_instance.ceph2.fqdn
+}
+
+output "ceph2_private_ip" {
+  value = yandex_compute_instance.ceph2.network_interface[0].ip_address
+}
+
+output "ceph3_hostname" {
+  value = yandex_compute_instance.ceph3.fqdn
+}
+
+output "ceph3_private_ip" {
+  value = yandex_compute_instance.ceph3.network_interface[0].ip_address
 }

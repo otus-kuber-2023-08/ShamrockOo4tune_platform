@@ -1,4 +1,3 @@
-ceph_count           = 3
 cloud_id             = "< ID >"
 folder_id            = "< ID >"
 image_id             = "fd85an6q1o26nf37i2nl" # Ubuntu 20.04

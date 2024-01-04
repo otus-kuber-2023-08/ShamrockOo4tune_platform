@@ -1,10 +1,3 @@
-
-variable "ceph_count" {
-  type        = number
-  default     = 3
-  description = "Qty of Ceph nodes. сloud-init expects to recieve exactly 3 nodes. In order to destroy Ceph cluster qty of 0 can be used"
-}
-
 variable "cloud_id" {
   description = "ID of the private cloud in YC"
   type        = string
@@ -31,10 +24,11 @@ variable "sa_key_file_path" {
 }
 
 variable "save_ssh_keys_locally" {
-  description = "Save generated SSH key pair locally in ./ansible/ansible_rsa"
+  description = "Save generated SSH key pair locally in ./ansible_rsa"
   type        = bool
   default     = true
 }
+
 variable "ssh_private_key_path" {
   description = "Path to ssh private key used to access bastion"
   type        = string

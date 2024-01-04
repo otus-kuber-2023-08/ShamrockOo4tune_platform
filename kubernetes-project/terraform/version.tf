@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.1.6"
+  required_version = ">= 1.4.2"
 
   required_providers {
     yandex = {
@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "s3" {
-    endpoint = "storage.yandexcloud.net"
+    endpoint = "https://storage.yandexcloud.net"
     bucket   = "shamrock004tune-tfstate"
     region   = "ru-central1"
     key      = "iac.tfstate"
