@@ -26,10 +26,6 @@ output "bastion_hostname" {
   value = yandex_compute_instance.bastion.hostname
 }
 
-output "api-server_balancer_ip" {
-  value = [for s in yandex_lb_network_load_balancer.platform-api-server.listener : s.internal_address_spec.*.address].0[0]
-}
-
 output "platform_ingress_ip" {
   value = [for s in yandex_lb_network_load_balancer.platform-ingress.listener : s.external_address_spec.*.address].0[0]
 }
@@ -43,6 +39,7 @@ output "public_key" {
   value     = tls_private_key.ssh_key.public_key_openssh
   sensitive = false
 }
+
 
 output "ceph1_hostname" {
   value = yandex_compute_instance.ceph1.fqdn

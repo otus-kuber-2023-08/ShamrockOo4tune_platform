@@ -13,6 +13,12 @@ variable "image_id" {
   type        = string
 }
 
+variable "image_id_bastion" {
+  description = "The id of the 'bastion jump host' compute instance image"
+  default     = "fd88m3uah9t47loeseir"
+  type        = string
+}
+
 variable "image_id_storages" {
   description = "The id of the compute instance image for storage cluster"
   type        = string
@@ -27,6 +33,12 @@ variable "save_ssh_keys_locally" {
   description = "Save generated SSH key pair locally in ./ansible_rsa"
   type        = bool
   default     = true
+}
+
+variable "platform_id" {
+  description = "Yandex compute instance platform_id"
+  default     = "standard-v2"
+  type        = string
 }
 
 variable "ssh_private_key_path" {

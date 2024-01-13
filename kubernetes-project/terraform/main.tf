@@ -1,92 +1,3 @@
-resource "yandex_vpc_network" "platform" {
-  name = "platform"
-}
-
-resource "yandex_vpc_gateway" "egress" {
-  name = "egress"
-  shared_egress_gateway {}
-}
-
-resource "yandex_vpc_route_table" "rt" {
-  name       = "rt"
-  network_id = yandex_vpc_network.platform.id
-  depends_on = [
-    yandex_vpc_network.platform,
-    yandex_vpc_gateway.egress,
-  ]
-
-  static_route {
-    destination_prefix = "0.0.0.0/0"
-    gateway_id         = yandex_vpc_gateway.egress.id
-  }
-}
-
-resource "yandex_vpc_subnet" "platform-subnet-1" {
-  name           = "platform-subnet-a"
-  zone           = "ru-central1-a"
-  network_id     = yandex_vpc_network.platform.id
-  v4_cidr_blocks = ["192.168.10.0/24"]
-  route_table_id = yandex_vpc_route_table.rt.id
-}
-
-resource "yandex_vpc_subnet" "platform-subnet-2" {
-  name           = "platform-subnet-b"
-  zone           = "ru-central1-b"
-  network_id     = yandex_vpc_network.platform.id
-  v4_cidr_blocks = ["192.168.20.0/24"]
-  route_table_id = yandex_vpc_route_table.rt.id
-}
-
-resource "yandex_vpc_subnet" "platform-subnet-3" {
-  name           = "platform-subnet-d"
-  zone           = "ru-central1-d"
-  network_id     = yandex_vpc_network.platform.id
-  v4_cidr_blocks = ["192.168.30.0/24"]
-  route_table_id = yandex_vpc_route_table.rt.id
-}
-
-resource "yandex_vpc_address" "platform_public_ip_1" {
-  name                = "platform_public_ip_1"
-  deletion_protection = false
-  external_ipv4_address {
-    zone_id = var.zone
-  }
-}
-
-resource "yandex_vpc_address" "platform_public_ip_2" {
-  name                = "platform_public_ip_2"
-  deletion_protection = false
-  external_ipv4_address {
-    zone_id = var.zone
-  }
-}
-
-resource "yandex_lb_network_load_balancer" "platform-api-server" {
-
-  name = "platform-api-server"
-  type = "internal"
-
-  listener {
-    name = "platform-api-server"
-    port = 6443
-    internal_address_spec {
-      subnet_id  = yandex_vpc_subnet.platform-subnet-1.id
-      ip_version = "ipv4"
-    }
-  }
-
-  attached_target_group {
-    target_group_id = yandex_compute_instance_group.k8s-master-nodes.load_balancer.0.target_group_id
-    healthcheck {
-      name = "kube-api-liveness-probe"
-      # TODO implement plaintext http endpoint for liveness checks
-      tcp_options {
-        port = 6443
-      }
-    }
-  }
-}
-
 resource "yandex_lb_network_load_balancer" "platform-ingress" {
   name = "platform-ingress"
 
@@ -110,6 +21,15 @@ resource "yandex_lb_network_load_balancer" "platform-ingress" {
     }
   }
 
+  listener {
+    name = "platform-api-server"
+    port = 6443
+    external_address_spec {
+      address    = yandex_vpc_address.platform_public_ip_2.external_ipv4_address[0].address
+      ip_version = "ipv4"
+    }
+  }
+
   attached_target_group {
     target_group_id = yandex_compute_instance_group.k8s-worker-nodes.load_balancer.0.target_group_id
     healthcheck {
@@ -119,16 +39,18 @@ resource "yandex_lb_network_load_balancer" "platform-ingress" {
       }
     }
   }
-}
 
-resource "yandex_iam_service_account" "admin" {
-  name = "admin"
-}
-
-resource "yandex_resourcemanager_folder_iam_binding" "editor" {
-  folder_id = var.folder_id
-  role      = "editor"
-  members   = ["serviceAccount:${yandex_iam_service_account.admin.id}"]
+  attached_target_group {
+    target_group_id = yandex_compute_instance_group.k8s-master-nodes.load_balancer.0.target_group_id
+    healthcheck {
+      name = "kube-api-liveness-probe"
+      # TODO implement plaintext http endpoint for liveness checks
+      healthy_threshold = 2
+      tcp_options {
+        port = 6443
+      }
+    }
+  }
 }
 
 resource "yandex_compute_instance_group" "k8s-master-nodes" {
@@ -136,7 +58,7 @@ resource "yandex_compute_instance_group" "k8s-master-nodes" {
   service_account_id = yandex_iam_service_account.admin.id
 
   instance_template {
-    platform_id = "standard-v2" // ru-central1-d doesn't provide standard-v1
+    platform_id = var.platform_id
     name        = "master{instance.index}"
     hostname    = "master{instance.index}"
 
@@ -161,7 +83,8 @@ resource "yandex_compute_instance_group" "k8s-master-nodes" {
         yandex_vpc_subnet.platform-subnet-2.id,
         yandex_vpc_subnet.platform-subnet-3.id,
       ]
-      nat = false
+      nat  = false
+      ipv6 = false
     }
 
     metadata = {
@@ -200,13 +123,13 @@ resource "yandex_compute_instance_group" "k8s-worker-nodes" {
   service_account_id = yandex_iam_service_account.admin.id
 
   instance_template {
-    platform_id = "standard-v2"
+    platform_id = var.platform_id
     name        = "worker{instance.index}"
     hostname    = "worker{instance.index}"
 
     resources {
       cores         = 2
-      memory        = 8
+      memory        = 4
       core_fraction = 20
     }
 
@@ -224,7 +147,8 @@ resource "yandex_compute_instance_group" "k8s-worker-nodes" {
         yandex_vpc_subnet.platform-subnet-2.id,
         yandex_vpc_subnet.platform-subnet-3.id,
       ]
-      nat = false
+      nat  = false
+      ipv6 = false
     }
 
     metadata = {
@@ -259,8 +183,9 @@ resource "yandex_compute_instance_group" "k8s-worker-nodes" {
 }
 
 resource "yandex_compute_instance" "bastion" {
-  name     = "bastion"
-  hostname = "bastion"
+  name        = "bastion"
+  hostname    = "bastion"
+  platform_id = var.platform_id
   resources {
     cores         = 2
     memory        = 4
@@ -269,7 +194,7 @@ resource "yandex_compute_instance" "bastion" {
 
   boot_disk {
     initialize_params {
-      image_id = var.image_id
+      image_id = var.image_id_bastion
       size     = 20
     }
   }

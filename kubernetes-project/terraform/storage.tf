@@ -42,7 +42,7 @@ resource "yandex_compute_instance" "ceph1" {
   name                      = "ceph1"
   hostname                  = "ceph1"
   allow_stopping_for_update = true
-  platform_id               = "standard-v2"
+  platform_id               = var.platform_id
   zone                      = "ru-central1-a"
 
   resources {
@@ -53,7 +53,7 @@ resource "yandex_compute_instance" "ceph1" {
 
   boot_disk {
     initialize_params {
-      image_id = var.image_id
+      image_id = var.image_id_storages
       size     = 20
     }
   }
@@ -86,7 +86,7 @@ resource "yandex_compute_instance" "ceph2" {
   name                      = "ceph2"
   hostname                  = "ceph2"
   allow_stopping_for_update = true
-  platform_id               = "standard-v2"
+  platform_id               = var.platform_id
   zone                      = "ru-central1-b"
 
   resources {
@@ -97,7 +97,7 @@ resource "yandex_compute_instance" "ceph2" {
 
   boot_disk {
     initialize_params {
-      image_id = var.image_id
+      image_id = var.image_id_storages
       size     = 20
     }
   }
@@ -130,7 +130,7 @@ resource "yandex_compute_instance" "ceph3" {
   name                      = "ceph3"
   hostname                  = "ceph3"
   allow_stopping_for_update = true
-  platform_id               = "standard-v2"
+  platform_id               = var.platform_id
   zone                      = "ru-central1-d"
 
   resources {
@@ -141,7 +141,7 @@ resource "yandex_compute_instance" "ceph3" {
 
   boot_disk {
     initialize_params {
-      image_id = var.image_id
+      image_id = var.image_id_storages
       size     = 20
     }
   }
