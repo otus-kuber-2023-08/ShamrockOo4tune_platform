@@ -1,0 +1,20 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-base
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: istio-system
+    server: {{ .Values.spec.destination.server }}
+  project: default
+  source:
+    chart: base
+    repoURL: {{ .Values.istio.source.repoURL }}
+    targetRevision: {{ .Values.istio.source.targetRevision }}
+...
