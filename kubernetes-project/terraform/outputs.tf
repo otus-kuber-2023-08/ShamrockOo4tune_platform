@@ -40,27 +40,26 @@ output "public_key" {
   sensitive = false
 }
 
-
 output "ceph1_hostname" {
-  value = yandex_compute_instance.ceph1.fqdn
+  value = var.ceph == true ? yandex_compute_instance.ceph1[0].fqdn : "n/a"
 }
 
 output "ceph1_private_ip" {
-  value = yandex_compute_instance.ceph1.network_interface[0].ip_address
+  value = var.ceph == true ? yandex_compute_instance.ceph1[0].network_interface[0].ip_address : "n/a"
 }
 
 output "ceph2_hostname" {
-  value = yandex_compute_instance.ceph2.fqdn
+  value = var.ceph == true ? yandex_compute_instance.ceph2[0].fqdn : "n/a"
 }
 
 output "ceph2_private_ip" {
-  value = yandex_compute_instance.ceph2.network_interface[0].ip_address
+  value = var.ceph == true ? yandex_compute_instance.ceph2[0].network_interface[0].ip_address : "n/a"
 }
 
 output "ceph3_hostname" {
-  value = yandex_compute_instance.ceph3.fqdn
+  value = var.ceph == true ? yandex_compute_instance.ceph3[0].fqdn : "n/a"
 }
 
 output "ceph3_private_ip" {
-  value = yandex_compute_instance.ceph3.network_interface[0].ip_address
+  value = var.ceph == true ? yandex_compute_instance.ceph3[0].network_interface[0].ip_address : "n/a"
 }

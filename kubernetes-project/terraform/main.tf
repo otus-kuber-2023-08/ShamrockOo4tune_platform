@@ -2,7 +2,7 @@ resource "yandex_lb_network_load_balancer" "platform-ingress" {
   name = "platform-ingress"
 
   listener {
-    name        = "platform-ingress-http"
+    name        = "platform-gateway-http"
     port        = 80
     target_port = 30080
     external_address_spec {
@@ -12,7 +12,7 @@ resource "yandex_lb_network_load_balancer" "platform-ingress" {
   }
 
   listener {
-    name        = "platform-ingress-https"
+    name        = "platform-gateway-https"
     port        = 443
     target_port = 30443
     external_address_spec {
@@ -33,9 +33,9 @@ resource "yandex_lb_network_load_balancer" "platform-ingress" {
   attached_target_group {
     target_group_id = yandex_compute_instance_group.k8s-worker-nodes.load_balancer.0.target_group_id
     healthcheck {
-      name = "ingress-probe"
+      name = "gateway-probe"
       tcp_options {
-        port = 30080
+        port = 30021
       }
     }
   }
@@ -94,7 +94,7 @@ resource "yandex_compute_instance_group" "k8s-master-nodes" {
 
   scale_policy {
     fixed_scale {
-      size = 3
+      size = var.masters_qty
     }
   }
 
@@ -107,10 +107,10 @@ resource "yandex_compute_instance_group" "k8s-master-nodes" {
   }
 
   deploy_policy {
-    max_unavailable = 3
-    max_creating    = 3
-    max_expansion   = 3
-    max_deleting    = 3
+    max_unavailable = var.masters_qty
+    max_creating    = var.masters_qty
+    max_expansion   = var.masters_qty
+    max_deleting    = var.masters_qty
   }
 
   load_balancer {
@@ -158,7 +158,7 @@ resource "yandex_compute_instance_group" "k8s-worker-nodes" {
 
   scale_policy {
     fixed_scale {
-      size = 3
+      size = var.workers_qty
     }
   }
 
@@ -171,10 +171,10 @@ resource "yandex_compute_instance_group" "k8s-worker-nodes" {
   }
 
   deploy_policy {
-    max_unavailable = 3
-    max_creating    = 3
-    max_expansion   = 3
-    max_deleting    = 3
+    max_unavailable = var.workers_qty
+    max_creating    = var.workers_qty
+    max_expansion   = var.workers_qty
+    max_deleting    = var.workers_qty
   }
 
   load_balancer {

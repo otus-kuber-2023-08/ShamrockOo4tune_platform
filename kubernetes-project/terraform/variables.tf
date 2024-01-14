@@ -1,3 +1,9 @@
+variable "ceph" {
+  description = "Provide ceph cluster or not"
+  type        = bool
+  default     = true
+}
+
 variable "cloud_id" {
   description = "ID of the private cloud in YC"
   type        = string
@@ -24,6 +30,12 @@ variable "image_id_storages" {
   type        = string
 }
 
+variable "masters_qty" {
+  description = "Qty of master nodes for k8s cluster. Change to this most probably will break CI"
+  type        = number
+  default     = 3
+}
+
 variable "sa_key_file_path" {
   description = "Path to yc service account key file i.e. '/path/to/key.json'"
   type        = string
@@ -44,6 +56,12 @@ variable "platform_id" {
 variable "ssh_private_key_path" {
   description = "Path to ssh private key used to access bastion"
   type        = string
+}
+
+variable "workers_qty" {
+  description = "Qty of worker nodes for k8s cluster. Change to this most probably will break CI"
+  type        = number
+  default     = 3
 }
 
 variable "zone" {

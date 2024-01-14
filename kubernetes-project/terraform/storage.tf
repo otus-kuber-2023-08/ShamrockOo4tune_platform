@@ -11,7 +11,7 @@
 # с дисками и фс
 
 resource "yandex_compute_disk" "ssd_for_ceph1" {
-  count     = 3
+  count     = var.ceph == true ? 3 : 0
   folder_id = var.folder_id
   name      = "ssd-1-${count.index + 1}"
   type      = "network-ssd"
@@ -20,7 +20,7 @@ resource "yandex_compute_disk" "ssd_for_ceph1" {
 }
 
 resource "yandex_compute_disk" "ssd_for_ceph2" {
-  count     = 3
+  count     = var.ceph == true ? 3 : 0
   folder_id = var.folder_id
   name      = "ssd-2-${count.index + 1}"
   type      = "network-ssd"
@@ -29,7 +29,7 @@ resource "yandex_compute_disk" "ssd_for_ceph2" {
 }
 
 resource "yandex_compute_disk" "ssd_for_ceph3" {
-  count     = 3
+  count     = var.ceph == true ? 3 : 0
   folder_id = var.folder_id
   name      = "ssd-3-${count.index + 1}"
   type      = "network-ssd"
@@ -38,6 +38,7 @@ resource "yandex_compute_disk" "ssd_for_ceph3" {
 }
 
 resource "yandex_compute_instance" "ceph1" {
+  count                     = var.ceph == true ? 1 : 0
   folder_id                 = var.folder_id
   name                      = "ceph1"
   hostname                  = "ceph1"
@@ -82,6 +83,7 @@ resource "yandex_compute_instance" "ceph1" {
 }
 
 resource "yandex_compute_instance" "ceph2" {
+  count                     = var.ceph == true ? 1 : 0
   folder_id                 = var.folder_id
   name                      = "ceph2"
   hostname                  = "ceph2"
@@ -126,6 +128,7 @@ resource "yandex_compute_instance" "ceph2" {
 }
 
 resource "yandex_compute_instance" "ceph3" {
+  count                     = var.ceph == true ? 1 : 0
   folder_id                 = var.folder_id
   name                      = "ceph3"
   hostname                  = "ceph3"
