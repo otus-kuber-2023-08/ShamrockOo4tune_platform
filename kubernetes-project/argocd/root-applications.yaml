@@ -1,0 +1,66 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-appprojects
+  namespace: argocd
+spec:
+  project: argocd
+  source:
+    path: kubernetes-project/argocd/argocd-appprojects
+    repoURL: https://github.com/otus-kuber-2023-08/ShamrockOo4tune_platform.git
+    targetRevision: kubernetes-project
+    directory:
+      recurse: true
+  destination:
+    namespace: argocd
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated: 
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-applications
+  namespace: argocd
+spec:
+  project: argocd
+  source:
+    path: kubernetes-project/argocd/argocd-applications
+    repoURL: https://github.com/otus-kuber-2023-08/ShamrockOo4tune_platform.git
+    targetRevision: kubernetes-project
+    directory:
+      recurse: true
+  destination:
+    namespace: argocd
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated: 
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-istio
+  namespace: argocd
+spec:
+  project: argocd
+  source:
+    path: kubernetes-project/argocd/istio
+    repoURL: https://github.com/otus-kuber-2023-08/ShamrockOo4tune_platform.git
+    targetRevision: kubernetes-project
+    directory:
+      recurse: true
+  destination:
+    namespace: istio-system
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated: 
+      prune: false
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+...
