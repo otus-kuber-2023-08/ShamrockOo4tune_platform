@@ -47,6 +47,11 @@ metadata:
   name: argocd-istio
   namespace: argocd
 spec:
+  ignoreDifferences:
+  - group: "admissionregistration.k8s.io"
+    kind: ValidatingWebhookConfiguration
+    jsonPointers:
+    - /webhooks
   project: argocd
   source:
     path: kubernetes-project/argocd/istio
@@ -63,4 +68,5 @@ spec:
       selfHeal: true
     syncOptions:
     - CreateNamespace=true
+    - RespectIgnoreDifferences=true
 ...
