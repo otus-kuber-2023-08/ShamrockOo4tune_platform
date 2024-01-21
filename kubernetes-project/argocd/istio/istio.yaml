@@ -8773,6 +8773,9 @@ subjects:
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
+  metadata:
+  annotations:
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
   labels:
     app: istiod
     istio: istiod
@@ -10759,7 +10762,7 @@ webhooks:
       namespace: istio-system
       path: /inject
       port: 443
-  failurePolicy: Ignore
+  failurePolicy: Fail
   name: rev.namespace.sidecar-injector.istio.io
   namespaceSelector:
     matchExpressions:
@@ -10795,7 +10798,7 @@ webhooks:
       namespace: istio-system
       path: /inject
       port: 443
-  failurePolicy: Ignore
+  failurePolicy: Fail
   name: rev.object.sidecar-injector.istio.io
   namespaceSelector:
     matchExpressions:
@@ -10833,7 +10836,7 @@ webhooks:
       namespace: istio-system
       path: /inject
       port: 443
-  failurePolicy: Ignore
+  failurePolicy: Fail
   name: namespace.sidecar-injector.istio.io
   namespaceSelector:
     matchExpressions:
@@ -10867,7 +10870,7 @@ webhooks:
       namespace: istio-system
       path: /inject
       port: 443
-  failurePolicy: Ignore
+  failurePolicy: Fail
   name: object.sidecar-injector.istio.io
   namespaceSelector:
     matchExpressions:
