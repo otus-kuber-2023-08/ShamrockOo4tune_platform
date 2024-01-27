@@ -11,10 +11,11 @@ spec:
   project: infra
   source:
     repoURL: https://prometheus-community.github.io/helm-charts
-    targetRevision: {{ .Values.prometheus-stack-revision }}
+    targetRevision: 56.2.0
     chart: kube-prometheus-stack
     helm:
-      values: "values/prometheus-values.yaml"
+      valueFiles:
+      - values/prometheus-values.yaml
   syncPolicy:
     automated:
       prune: false
