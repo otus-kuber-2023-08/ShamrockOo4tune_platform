@@ -3355,11 +3355,11 @@ prometheus:
     ## ServiceMonitors to be selected for target discovery.
     ## If {}, select all ServiceMonitors
     ##
-    serviceMonitorSelector: {}
+    #serviceMonitorSelector: {}
     ## Example which selects ServiceMonitors with label "prometheus" set to "somelabel"
-    # serviceMonitorSelector:
-    #   matchLabels:
-    #     prometheus: somelabel
+    serviceMonitorSelector:
+      matchLabels:
+        prometheus: tracking
 
     ## Namespaces to be selected for ServiceMonitor discovery.
     ##
