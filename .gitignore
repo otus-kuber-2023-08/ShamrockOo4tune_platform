@@ -1,3 +1,6 @@
+# ide
+.vscode
+
 # 3rd party projects and repos
 kubernetes-logging/v8.5.1.tar.gz
 kubernetes-logging/helm-charts-8.5.1
