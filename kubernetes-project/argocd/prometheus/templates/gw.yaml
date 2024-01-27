@@ -1,0 +1,31 @@
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: prometheus-gateway
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "grafana.shamrockoo4tune.ru"
+    - "prometheus.shamrockoo4tune.ru"
+    tls:
+      httpsRedirect: false
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    - "grafana.shamrockoo4tune.ru"
+    - "prometheus.shamrockoo4tune.ru"
+    tls:
+      credentialName: prometheus-tls
+      maxProtocolVersion: TLSV1_3
+      minProtocolVersion: TLSV1_2
+      mode: SIMPLE
+...

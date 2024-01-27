@@ -2,19 +2,21 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: argocd-ui
+  name: prometheus-tweaks
   namespace: argocd
 spec:
   project: infra
   source:
-    path: kubernetes-project/argocd/argocd-ui
+    path: kubernetes-project/argocd/prometheus-tweaks
     repoURL: https://github.com/otus-kuber-2023-08/ShamrockOo4tune_platform.git
     targetRevision: kubernetes-project
   destination:
-    namespace: argocd
+    namespace: prometheus
     server: https://kubernetes.default.svc
   syncPolicy:
     automated: 
       prune: false
       selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
 ...

@@ -2,15 +2,15 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cluster-issuer
+  name: tls-certs
   namespace: argocd
 spec:
   destination:
-    namespace: cert-manager
+    namespace: istio-system
     server: https://kubernetes.default.svc
   project: infra
   source:
-    path: kubernetes-project/argocd/cluster-issuers
+    path: kubernetes-project/argocd/tls-certs
     repoURL: https://github.com/otus-kuber-2023-08/ShamrockOo4tune_platform.git
     targetRevision: kubernetes-project
   syncPolicy:
