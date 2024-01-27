@@ -13,12 +13,6 @@ spec:
   - repoURL: https://prometheus-community.github.io/helm-charts
     targetRevision: 56.2.0
     chart: kube-prometheus-stack
-    helm:
-      valueFiles:
-      - $values/kubernetes-project/argocd/prometheus/values/prometheus-values.yaml
-  - repoURL: https://github.com/otus-kuber-2023-08/ShamrockOo4tune_platform.git
-    targetRevision: kubernetes-project
-    ref: values  
   syncPolicy:
     automated:
       prune: false
