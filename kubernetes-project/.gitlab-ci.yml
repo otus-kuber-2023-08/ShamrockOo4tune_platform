@@ -113,7 +113,7 @@ generate-inventory:
     - scp    -o "StrictHostKeyChecking no" -i ansible_rsa ceph/all.yml       ansible@$BASTION_IP:/home/ansible/ceph-ansible/group_vars/all.yml
     - scp    -o "StrictHostKeyChecking no" -i ansible_rsa ceph/osds.yml      ansible@$BASTION_IP:/home/ansible/ceph-ansible/group_vars/osds.yml
     - for i in 1 2 3 ; do sed -i "s/master${i}_ip/$(cat outputs.json | jq -r .master_nodes_private_ips.value[$((i-1))])/;s/worker${i}_ip/$(cat outputs.json | jq -r .worker_nodes_private_ips.value[$((i-1))])/" k8s/hosts.yaml ; done
-    - envsubst '$ARGOCD_ADMIN_PASSWORD' < k8s/addons.yml.template > k8s/addons.yml; envsubst '$PLATFORM_INGRESS_IP' < k8s/k8s-cluster.yml.template > k8s/k8s-cluster.yml
+    - envsubst '$SELECTEL_API_TOKEN' < argocd/selectel-api-token.yml.template > argocd/selectel-api-token.yml; envsubst '$ARGOCD_ADMIN_PASSWORD' < k8s/addons.yml.template > k8s/addons.yml; envsubst '$PLATFORM_INGRESS_IP' < k8s/k8s-cluster.yml.template > k8s/k8s-cluster.yml
     - scp    -o "StrictHostKeyChecking no" -i ansible_rsa k8s/hosts.yaml      ansible@$BASTION_IP:/home/ansible/kubespray/inventory/mycluster/hosts.yaml
     - scp    -o "StrictHostKeyChecking no" -i ansible_rsa k8s/addons.yml      ansible@$BASTION_IP:/home/ansible/kubespray/inventory/mycluster/group_vars/k8s_cluster/addons.yml
     - scp    -o "StrictHostKeyChecking no" -i ansible_rsa k8s/all.yml         ansible@$BASTION_IP:/home/ansible/kubespray/inventory/mycluster/group_vars/all/all.yml

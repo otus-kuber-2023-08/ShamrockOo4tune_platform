@@ -10,7 +10,19 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-staging
     solvers:
-    - http01:
-        ingress:
-          class: istio
+    - dns01:
+        webhook:
+          groupName: acme.selectel.ru
+          solverName: selectel
+          config:
+            apiKeySecretRef:
+              name: selectel-api-key
+              key: token
+
+            # Optional config, shown with default values
+            #   all times in seconds
+            ttl: 120
+            timeout: 30
+            propagationTimeout: 120
+            pollingInterval: 2
 ...

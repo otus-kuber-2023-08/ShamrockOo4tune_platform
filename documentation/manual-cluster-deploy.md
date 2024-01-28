@@ -33,7 +33,6 @@ export ARGOCD_ADMIN_PASSWORD=ytnybr
 export PLATFORM_INGRESS_IP=$(cat ~/outputs.json | jq -r .platform_ingress_ip.value)
 envsubst '$ARGOCD_ADMIN_PASSWORD' < inventory/mycluster/group_vars/k8s_cluster/addons.yml.template > inventory/mycluster/group_vars/k8s_cluster/addons.yml
 envsubst '$PLATFORM_INGRESS_IP'   < inventory/mycluster/group_vars/k8s_cluster/k8s-cluster.yml.template > inventory/mycluster/group_vars/k8s_cluster/k8s-cluster.yml
-
 sudo virtualenv ../kubespray; source bin/activate; sudo pip install -r requirements.txt; sudo ansible-playbook -i inventory/mycluster/hosts.yaml --become --become-user=root --user=ansible --key-file=/home/ansible/.ssh/id_rsa cluster.yml; deactivate
 ```  
 
@@ -53,8 +52,11 @@ echo "complete -o default -F __start_kubectl k" >> ~/.bashrc
 k get nodes -o wide
 ```
 
-### Istio
+### ArgoCD
 ```bash
+SELECTEL_API_TOKEN=
+
+envsubst '$SELECTEL_API_TOKEN' < /home/ansible/argocd/selectel-api-token.yml.template > home/ansible/argocd/selectel-api-token.yml
 k label namespace argocd istio-injection=enabled
 k -n argocd patch cm argocd-cmd-params-cm --patch-file ~/argocd/argo-patch.yaml
 k -n argocd scale deployment argocd-server --replicas=0 && sleep 5 && k -n argocd scale deployment argocd-server --replicas=1 && sleep 30
@@ -105,3 +107,5 @@ argocd app sync root-app
 ```  
 
 <br>  
+
+k -n argocd annotate service argocd-server-metrics "prometheus.io/scrape=true"
