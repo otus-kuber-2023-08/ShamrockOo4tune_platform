@@ -56,7 +56,8 @@ k get nodes -o wide
 ```bash
 SELECTEL_API_TOKEN=
 
-envsubst '$SELECTEL_API_TOKEN' < /home/ansible/argocd/selectel-api-token.yml.template > home/ansible/argocd/selectel-api-token.yml
+envsubst '$SELECTEL_API_TOKEN' < /home/ansible/argocd/selectel-api-token.yml.template > /home/ansible/argocd/selectel-api-token.yml
+k apply -f /home/ansible/argocd/selectel-api-token.yml
 k label namespace argocd istio-injection=enabled
 k -n argocd patch cm argocd-cmd-params-cm --patch-file ~/argocd/argo-patch.yaml
 k -n argocd scale deployment argocd-server --replicas=0 && sleep 5 && k -n argocd scale deployment argocd-server --replicas=1 && sleep 30
