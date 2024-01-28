@@ -1,0 +1,16 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: shamrockoo4tune-tls
+  namespace: istio-system
+spec:
+  secretName: shamrockoo4tune-tls
+  issuerRef:
+    name: letsencrypt-staging    
+    kind: ClusterIssuer
+  commonName: shamrockoo4tune.ru 
+  dnsNames: 
+  - 'shamrockoo4tune.ru'
+  - '*.shamrockoo4tune.ru'
+...
