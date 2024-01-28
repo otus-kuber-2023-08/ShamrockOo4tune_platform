@@ -1,6 +1,0 @@
-apiVersion: v2
-name: prometheus
-description: "k8s.shamrockoo4tune.ru prometheus stack for argo and istio deploy"
-type: application
-version: 0.1.0
-appVersion: 0.0.1
