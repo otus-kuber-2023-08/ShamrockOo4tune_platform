@@ -54,7 +54,7 @@ k get nodes -o wide
 
 ### ArgoCD
 ```bash
-SELECTEL_API_TOKEN=
+export SELECTEL_API_TOKEN=
 
 envsubst '$SELECTEL_API_TOKEN' < /home/ansible/argocd/selectel-api-token.yml.template > /home/ansible/argocd/selectel-api-token.yml
 k apply -f /home/ansible/argocd/selectel-api-token.yml

@@ -1,0 +1,18 @@
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  namespace: istio-system
+  name: grafana
+spec:
+  gateways:
+  - cluster-gateway
+  hosts:
+  - 'grafana.shamrockoo4tune.ru'
+  http:
+  - route:
+    - destination:
+        host: prometheus-grafana.prometheus.svc.cluster.local
+        port:
+          number: 80
+...
