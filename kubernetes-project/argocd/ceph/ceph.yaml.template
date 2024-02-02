@@ -18,7 +18,7 @@ spec:
     helm:
       values: |
         csiConfig:
-          - clusterID: CEPH_FSID
+          - clusterID: "${CEPH_FSID}"
             monitors:
               - "ceph1.ru-central1.internal:6789"
               - "ceph2.ru-central1.internal:6789"
