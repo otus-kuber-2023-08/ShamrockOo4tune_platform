@@ -74,6 +74,9 @@ ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "sudo
 ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "sudo mkdir -p /mnt/mycephfs"
 ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh ceph1.ru-central1.internal 'sudo ceph auth get-key client.kube' | sudo tee /etc/ceph/kube.key"
 ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "sudo chmod 600 /etc/ceph/kube.key"
+
+sudo ceph fs subvolumegroup create cephfs csi
+
 # ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "sudo mount -t ceph kube@.cephfs=/ /mnt/mycephfs -o secretfile=/etc/ceph/kube.key"
 export CEPH_FSID=$(ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh ceph1.ru-central1.internal 'sudo ceph fsid'")
 export CEPH_ADMIN_KEY=$(ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh ceph1.ru-central1.internal 'sudo ceph auth get client.admin'" | grep 'key = ' | awk '{ print $3 }')
@@ -148,6 +151,10 @@ k -n argocd patch cm argocd-cmd-params-cm --patch-file ~/argocd/argo-patch.yaml
 k -n argocd scale deployment argocd-server --replicas=0 && sleep 5 && k -n argocd scale deployment argocd-server --replicas=1 && sleep 30
 k apply -f /home/ansible/argocd/root-projects.yaml 
 k apply -f /home/ansible/argocd/root-applications.yaml
+sleep 600
+ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible ${BASTION_IP} CEPH_FSID=${CEPH_FSID} "envsubst '\${CEPH_FSID}' < ~/argocd/ceph/ceph.yaml.template > ~/argocd/ceph/ceph.yaml"
+ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible ${BASTION_IP} CEPH_ADMIN_KEY=${CEPH_ADMIN_KEY} "envsubst '\${CEPH_ADMIN_KEY}' < ~/argocd/ceph/secret.yaml.template > ~/argocd/ceph/secret.yaml"
+
 ```  
 
 ### ArgoCD cmd-line tool
