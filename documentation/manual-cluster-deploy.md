@@ -63,7 +63,7 @@ ssh -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible ${BASTION_IP}
 ### Ceph
 On local machine 
 ```bash
-ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "cd /home/ansible/ceph-ansible; sudo virtualenv ../ceph-ansible; source bin/activate; sudo pip install 'ansible-core<2.15.5'; sudo pip install -r requirements.txt; sudo ansible-galaxy install -r requirements.yml; sudo ansible-playbook -i inventory.ini ./site.yml; deactivate"
+ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "cd /home/ansible/ceph-ansible; sudo virtualenv ../ceph-ansible; source bin/activate; sudo pip install -r requirements.txt; sudo -H pip install -Iv 'resolvelib<0.6.0'; sudo ansible-galaxy install -r requirements.yml; sudo ansible-playbook -i inventory.ini ./site.yml; deactivate"
 ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh -o 'StrictHostKeyChecking no' ceph1.ru-central1.internal 'sudo ceph config set mon auth_allow_insecure_global_id_reclaim false'"
 ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh -o 'StrictHostKeyChecking no' ceph1.ru-central1.internal 'sudo ceph -s'"
 ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "sudo mkdir -p -m 755 /etc/ceph"
@@ -202,3 +202,9 @@ argocd app sync root-app
 <br>  
 
 k -n argocd annotate service argocd-server-metrics "prometheus.io/scrape=true"
+
+
+helm upgrade --install kibana ./helm-charts-8.5.1/kibana -n log --debug
+
+
+k label namespace log istio-injection=enabled

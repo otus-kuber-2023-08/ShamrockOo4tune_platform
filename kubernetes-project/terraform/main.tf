@@ -128,8 +128,8 @@ resource "yandex_compute_instance_group" "k8s-worker-nodes" {
     hostname    = "worker{instance.index}"
 
     resources {
-      cores         = 2
-      memory        = 4
+      cores         = 4
+      memory        = 8
       core_fraction = 20
     }
 
