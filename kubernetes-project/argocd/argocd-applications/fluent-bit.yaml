@@ -15,6 +15,30 @@ spec:
     repoURL: https://fluent.github.io/helm-charts
     targetRevision: 0.43.0
     chart: fluent-bit
+    helm:
+      values: |
+        config:
+          inputs: |
+            [INPUT]
+                Name tail
+                Path /var/log/containers/*
+                multiline.parser docker, cri
+                Tag fluent-bit.*
+                Mem_Buf_Limit 5MB
+                Skip_Long_Lines On        
+          outputs: |
+            [OUTPUT]
+                Name es
+                Match fluent-bit.*
+                Host elasticsearch-master
+                Logstash_Format On
+                Logstash_Prefix kube
+                Retry_Limit False
+                tls On
+                tls.verify Off
+                http_user elastic
+                http_passwd elastic
+                Suppress_Type_Name On
   syncPolicy:
     automated: 
       prune: false
