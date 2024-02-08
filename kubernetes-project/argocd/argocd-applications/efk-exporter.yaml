@@ -27,6 +27,7 @@ spec:
           shards: true
           snapshots: true
           cluster_settings: true
+          sslSkipVerify: true
   syncPolicy:
     automated: 
       prune: false
