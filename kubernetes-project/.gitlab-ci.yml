@@ -503,7 +503,6 @@ kickstart-gitops:
         kubectl apply -f ~/argocd/root-projects.yaml 
         kubectl apply -f ~/argocd/root-applications.yaml
         kubectl apply -f ~/argocd/selectel-api-token.yml
-        kubectl label namespace argocd istio-injection=enabled
         kubectl -n argocd patch cm argocd-cmd-params-cm --patch-file ~/argocd/argo-patch.yaml
         kubectl -n argocd scale deployment argocd-server --replicas=0
         sleep 5
