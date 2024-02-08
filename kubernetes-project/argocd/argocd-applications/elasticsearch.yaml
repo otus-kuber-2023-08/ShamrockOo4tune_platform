@@ -25,6 +25,9 @@ spec:
               storage: 5Gi
         image: "shamrockoo4tune/elasticsearch"
         imageTag: "8.5.1"
+        secret:
+          enabled: true
+          password: "elastic"
   syncPolicy:
     automated: 
       prune: false
