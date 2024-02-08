@@ -60,7 +60,8 @@ spec:
                 tls.verify Off
                 http_user elastic
                 http_passwd elastic
-
+                Suppress_Type_Name On
+                
           customParsers: |
             [PARSER]
                 Name docker_no_time
