@@ -34,6 +34,8 @@ spec:
               accessModes:
               - ReadWriteOnce
               size: 8Gi
+          metrics:
+            enabled: true
         
   # Destination cluster and namespace to deploy the application
   destination:
