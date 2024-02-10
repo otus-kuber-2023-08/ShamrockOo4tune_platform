@@ -33,6 +33,11 @@ data:
   alerts: |
     {}
   prometheus.yml: |
+    alerting:
+      alertmanagers:
+        - static_configs:
+          - targets:
+            - alertmanager.mon.svc.cluster.local:9093
     global:
       evaluation_interval: 1m
       scrape_interval: 15s
@@ -347,7 +352,20 @@ data:
   recording_rules.yml: |
     {}
   rules: |
-    {}
+    groups:
+    - name: AllInstances
+      rules:
+      - alert: InstanceDown
+        # Condition for alerting
+        expr: up == 0
+        for: 1m
+        # Annotation - additional informational labels to store more information
+        annotations:
+          title: 'Instance {{ $labels.instance }} down'
+          description: '{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute.'
+        # Labels - additional labels to be attached to the alert
+        labels:
+          severity: 'critical'
 ---
 # Source: prometheus/templates/clusterrole.yaml
 apiVersion: rbac.authorization.k8s.io/v1
