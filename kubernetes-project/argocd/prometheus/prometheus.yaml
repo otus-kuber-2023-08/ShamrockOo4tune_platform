@@ -339,7 +339,11 @@ data:
       - targets: ['ceph1.ru-central1.internal:9283','ceph2.ru-central1.internal:9283','ceph3.ru-central1.internal:9283']
         labels:
           alias: ceph-exporter
-
+    - job_name: 'efk-exporter'
+      static_configs:
+      - targets: ['efk-exporter-prometheus-elasticsearch-exporter.log:9108']
+        labels:
+          alias: efk-exporter
   recording_rules.yml: |
     {}
   rules: |
