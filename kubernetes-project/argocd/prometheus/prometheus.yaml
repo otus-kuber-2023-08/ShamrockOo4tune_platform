@@ -545,5 +545,21 @@ spec:
           configMap:
             name: prometheus
         - name: storage-volume
-          emptyDir:
-            {}
+          persistentVolumeClaim:
+            claimName: prometheus-storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  finalizers:
+  - kubernetes.io/pvc-protection
+  name: prometheus-storage
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: csi-cephfs-sc
+  resources:
+    requests:
+      storage: 5Gi
+  volumeMode: Filesystem
+...
