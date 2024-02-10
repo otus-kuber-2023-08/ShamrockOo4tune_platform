@@ -351,7 +351,17 @@ data:
           alias: efk-exporter
     - job_name: 'node-exporter'
       static_configs:
-      - targets: ['node-exporter-prometheus-node-exporter.istio-system.svc.cluster.local:9100']
+      - targets: 
+          - ceph1.ru-central1.internal:9100
+          - ceph2.ru-central1.internal:9100
+          - ceph3.ru-central1.internal:9100
+          - master1.ru-central1.internal:9100
+          - master2.ru-central1.internal:9100
+          - master3.ru-central1.internal:9100
+          - worker1.ru-central1.internal:9100
+          - worker2.ru-central1.internal:9100
+          - worker3.ru-central1.internal:9100
+          - bastion.ru-central1.internal:9100
   recording_rules.yml: |
     {}
   rules: |
