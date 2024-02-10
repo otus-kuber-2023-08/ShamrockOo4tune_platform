@@ -1,3 +1,28 @@
+resource "yandex_lb_network_load_balancer" "platform-api" {
+  name = "platform-api"
+
+  listener {
+    name = "platform-api-server"
+    port = 6443
+    external_address_spec {
+      address    = yandex_vpc_address.platform_public_ip_1.external_ipv4_address[0].address
+      ip_version = "ipv4"
+    }
+  }
+
+  attached_target_group {
+    target_group_id = yandex_compute_instance_group.k8s-master-nodes.load_balancer.0.target_group_id
+    healthcheck {
+      name = "kube-api-liveness-probe"
+      # TODO implement plaintext http endpoint for liveness checks
+      healthy_threshold = 2
+      tcp_options {
+        port = 6443
+      }
+    }
+  }
+}
+
 resource "yandex_lb_network_load_balancer" "platform-ingress" {
   name = "platform-ingress"
 
@@ -21,15 +46,6 @@ resource "yandex_lb_network_load_balancer" "platform-ingress" {
     }
   }
 
-  listener {
-    name = "platform-api-server"
-    port = 6443
-    external_address_spec {
-      address    = yandex_vpc_address.platform_public_ip_2.external_ipv4_address[0].address
-      ip_version = "ipv4"
-    }
-  }
-
   attached_target_group {
     target_group_id = yandex_compute_instance_group.k8s-worker-nodes.load_balancer.0.target_group_id
     healthcheck {
@@ -40,17 +56,6 @@ resource "yandex_lb_network_load_balancer" "platform-ingress" {
     }
   }
 
-  attached_target_group {
-    target_group_id = yandex_compute_instance_group.k8s-master-nodes.load_balancer.0.target_group_id
-    healthcheck {
-      name = "kube-api-liveness-probe"
-      # TODO implement plaintext http endpoint for liveness checks
-      healthy_threshold = 2
-      tcp_options {
-        port = 6443
-      }
-    }
-  }
 }
 
 resource "yandex_compute_instance_group" "k8s-master-nodes" {
@@ -200,11 +205,10 @@ resource "yandex_compute_instance" "bastion" {
   }
 
   network_interface {
-    ip_address     = "192.168.10.3"
-    ipv6           = false
-    nat            = true
-    nat_ip_address = yandex_vpc_address.platform_public_ip_1.external_ipv4_address[0].address
-    subnet_id      = yandex_vpc_subnet.platform-subnet-1.id
+    ip_address = "192.168.10.3"
+    ipv6       = false
+    nat        = true
+    subnet_id  = yandex_vpc_subnet.platform-subnet-1.id
   }
 
   metadata = {
