@@ -208,3 +208,15 @@ helm upgrade --install kibana ./helm-charts-8.5.1/kibana -n log --debug
 
 
 k label namespace log istio-injection=enabled
+
+```
+for NODE in ceph1.ru-central1.internal ceph2.ru-central1.internal ceph3.ru-central1.internal master1.ru-central1.internal master2.ru-central1.internal master3.ru-central1.internal worker1.ru-central1.internal worker2.ru-central1.internal worker3.ru-central1.internal; do 
+  ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh -o 'StrictHostKeyChecking no' ${NODE} 'wget https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz'"                                                                                                         
+  ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh -o 'StrictHostKeyChecking no' ${NODE} 'tar -xvzf node_exporter-1.7.0.linux-amd64.tar.gz'"
+  ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh -o 'StrictHostKeyChecking no' ${NODE} 'sudo cp node_exporter-1.7.0.linux-amd64/node_exporter /usr/local/bin/'"
+  ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh -o 'StrictHostKeyChecking no' ${NODE} 'sudo useradd node_exporter'"
+  ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "scp -o 'StrictHostKeyChecking no' node_exporter.service ${NODE}:~/node_exporter.service"
+  ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh -o 'StrictHostKeyChecking no' ${NODE} 'sudo cp node_exporter.service /etc/systemd/system/node_exporter.service'"
+  ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible $BASTION_IP "ssh -o 'StrictHostKeyChecking no' ${NODE} 'sudo systemctl enable node_exporter.service --now'"
+done
+```
