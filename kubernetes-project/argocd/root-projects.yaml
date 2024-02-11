@@ -1,0 +1,23 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  description: Root Argocd Project
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: argocd
+    server: https://kubernetes.default.svc
+  - namespace: istio-system
+    server: https://kubernetes.default.svc
+  - namespace: shop
+    server: https://kubernetes.default.svc  
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+  orphanedResources:
+    warn: false
+...

@@ -1,0 +1,41 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  name: ceph
+  namespace: argocd
+spec:
+  destination:
+    namespace: ceph-csi-cephfs
+    server: https://kubernetes.default.svc
+  project: infra
+  source:
+    repoURL: https://ceph.github.io/csi-charts
+    targetRevision: 3.10.1
+    chart: ceph-csi-cephfs
+    helm:
+      values: |
+        csiConfig:
+          - clusterID: "${CEPH_FSID}"
+            monitors:
+              - "ceph1.ru-central1.internal:6789"
+              - "ceph2.ru-central1.internal:6789"
+              - "ceph3.ru-central1.internal:6789"
+        nodeplugin:
+          name: nodeplugin
+          updateStrategy: RollingUpdate
+          priorityClassName: system-node-critical
+          httpMetrics:
+            enabled: true
+            containerPort: 8089
+        provisioner:
+          replicaCount: 1
+  syncPolicy:
+    automated: 
+      prune: false
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+...

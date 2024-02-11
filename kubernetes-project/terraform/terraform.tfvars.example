@@ -1,0 +1,7 @@
+cloud_id             = "< ID >"
+folder_id            = "< ID >"
+image_id             = "fd85an6q1o26nf37i2nl" # Ubuntu 20.04
+image_id_storages    = "fd8nu8se2afcci22tpa5" # Debian 11
+sa_key_file_path     = "/path/to/key.json"
+ssh_private_key_path = "/path/to/.ssh/id_rsa"
+zone                 = "ru-central1-a"

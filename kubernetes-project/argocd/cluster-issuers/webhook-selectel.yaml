@@ -1,0 +1,20 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: webhook-selectel
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    namespace: cert-manager
+  project: infra
+  source:
+    repoURL: https://selectel.github.io/cert-manager-webhook-selectel
+    targetRevision: 1.2.4
+    chart: cert-manager-webhook-selectel
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+...

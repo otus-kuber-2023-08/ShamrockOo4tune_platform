@@ -1,0 +1,22 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  name: grafana
+  namespace: argocd
+spec:
+  destination:
+    namespace: istio-system # same as example in istio documentation
+    server: https://kubernetes.default.svc
+  project: infra
+  source:
+    path: kubernetes-project/argocd/grafana
+    repoURL: https://github.com/otus-kuber-2023-08/ShamrockOo4tune_platform.git
+    targetRevision: kubernetes-project
+  syncPolicy:
+    automated: 
+      prune: false
+      selfHeal: true
+...

@@ -20,6 +20,6 @@ ShamrockOo4tune Platform repository
 |13|24     |Диагностика и отладка кластера и приложений в нем                            |[kubernetes-debug](./documentation/13_24_kubernetes_debug.MD)                            |  
 |14|25     |Подходы к развертыванию и обновлению production-grade кластера               |[kubernetes-prod](./documentation/14_25_kubernetes_prod.MD)                              |  
 |15|26     |Выбор темы и организация проектной работы                                    |[kubernetes-project-selection](./documentation/15_26_kubernetes_project_selection.MD)    |  
-|16|27     |Курсовой проект                                                              |[kubernetes-project](./documentation/15_27_kubernetes_project.MD)                        |  
+|16|27     |Курсовой проект                                                              |[kubernetes-project](./documentation/16_27_kubernetes_project.MD)                        |  
 
 <br>  

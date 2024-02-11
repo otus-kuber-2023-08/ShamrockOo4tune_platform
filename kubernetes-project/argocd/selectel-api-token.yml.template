@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: selectel-api-key
+  namespace: cert-manager
+type: Opaque
+stringData:
+  token: "${SELECTEL_API_TOKEN}"
+...

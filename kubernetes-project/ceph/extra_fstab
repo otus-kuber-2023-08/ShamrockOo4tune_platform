@@ -1,0 +1,1 @@
+kube@.cephfs=/ /mnt/mycephfs ceph mon_addr=ceph1.ru-central1.internal:6789/ceph2.ru-central1.internal:6789/ceph3.ru-central1.internal:6789,secretfile=/etc/ceph/kube.key,noatime,_netdev 0 0

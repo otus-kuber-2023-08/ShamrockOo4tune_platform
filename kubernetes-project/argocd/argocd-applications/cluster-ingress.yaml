@@ -1,0 +1,24 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  name: cluster-ingress
+  namespace: argocd
+spec:
+  destination:
+    namespace: istio-system
+    server: https://kubernetes.default.svc
+  project: infra
+  source:
+    path: kubernetes-project/argocd/cluster-ingress
+    repoURL: https://github.com/otus-kuber-2023-08/ShamrockOo4tune_platform.git
+    targetRevision: kubernetes-project
+  syncPolicy:
+    automated: 
+      prune: false
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+...

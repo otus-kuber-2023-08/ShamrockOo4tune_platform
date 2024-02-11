@@ -1,0 +1,515 @@
+image:
+  name: registry.gitlab.com/gitlab-org/gitlab-build-images:terraform
+  entrypoint:
+    - '/usr/bin/env'
+    - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
+cache:
+  paths:
+    - .terraform
+
+variables:
+  YC_SERVICE_ACCOUNT_KEY_FILE: "/home/anduser/yc-terraform/key.json"
+
+stages: 
+  - infrastructure_provisioning 
+  - bastion_configuration
+  - generate-inventory
+  - deploy
+  - gitops
+  
+before_script:
+  - apk add gnupg
+  - mkdir -p /home/anduser/yc-terraform
+  - cat $YC_KEY > /home/anduser/yc-terraform/key.json
+  - cd ./kubernetes-project/terraform
+  - cat $TFVARS > terraform.tfvars
+  - |
+    cat <<EOF >> ~/.terraformrc
+    provider_installation {
+      network_mirror {
+        url = "https://terraform-mirror.yandexcloud.net/"
+        include = ["registry.terraform.io/*/*"]
+      }
+      direct {
+        exclude = ["registry.terraform.io/*/*"]
+      }
+    }
+    EOF
+  - terraform init -reconfigure
+
+validate_and_plan:
+  stage: infrastructure_provisioning
+  when: manual
+  script: 
+    - terraform validate
+    - terraform plan -out="planfile"
+  after_script:
+    - >
+      gpg \
+        --symmetric \
+        --batch \
+        --yes \
+        --passphrase ${ARTIFACT_ENCRYPTION_PASSPHRASE} \
+        -o ./kubernetes-project/terraform/planfile.gpg \
+        -c ./kubernetes-project/terraform/planfile
+  artifacts:
+    paths:
+      - kubernetes-project/terraform/planfile.gpg
+    expire_in: 1800 seconds
+
+apply:
+  stage: infrastructure_provisioning    
+  needs:
+    - job: validate_and_plan
+      artifacts: true
+  script:
+    - >
+      echo ${ARTIFACT_ENCRYPTION_PASSPHRASE} | gpg \
+        --batch \
+        --always-trust \
+        --yes \
+        --passphrase-fd 0 \
+        -d \
+        -o planfile planfile.gpg
+    - terraform apply -auto-approve "planfile"
+    - terraform output -json > outputs.json 
+  after_script:
+    - >
+      gpg \
+        --symmetric \
+        --batch \
+        --yes \
+        --passphrase ${ARTIFACT_ENCRYPTION_PASSPHRASE} \
+        -o ./kubernetes-project/terraform/ansible_rsa.gpg \
+        -c ./kubernetes-project/terraform/ansible_rsa
+    - >
+      gpg \
+        --symmetric \
+        --batch \
+        --yes \
+        --passphrase ${ARTIFACT_ENCRYPTION_PASSPHRASE} \
+        -o ./kubernetes-project/terraform/outputs.json.gpg \
+        -c ./kubernetes-project/terraform/outputs.json
+  artifacts:
+    paths:
+      - kubernetes-project/terraform/ansible_rsa.gpg
+      - kubernetes-project/terraform/outputs.json.gpg
+    expire_in: 10800 seconds
+
+configure-bastion:
+  stage: bastion_configuration
+  image: alpine
+  needs:
+    - job: apply
+      artifacts: true
+  before_script:
+    - cd ./kubernetes-project/terraform
+    - apk update; apk add gnupg jq openssh
+    - >
+      echo ${ARTIFACT_ENCRYPTION_PASSPHRASE} | gpg \
+        --batch \
+        --always-trust \
+        --yes \
+        --passphrase-fd 0 \
+        -d \
+        -o ansible_rsa ansible_rsa.gpg
+    - >
+      echo ${ARTIFACT_ENCRYPTION_PASSPHRASE} | gpg \
+        --batch \
+        --always-trust \
+        --yes \
+        --passphrase-fd 0 \
+        -d \
+        -o outputs.json outputs.json.gpg
+    - chmod 0400 ansible_rsa
+    - export BASTION_IP=$(cat outputs.json | jq -r .bastion_public_ip.value)
+  script:
+    - >
+      scp -o "StrictHostKeyChecking no" -i ansible_rsa \
+        ansible_rsa \
+        ansible@${BASTION_IP}:/home/ansible/.ssh/id_rsa || true 
+    - >
+      ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible \
+        ${BASTION_IP} "\
+          sudo apt-get -y update && \
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -y install \
+            software-properties-common \
+            gnupg2 \
+            git \
+            curl \
+            python3-pip \
+            ansible-core \
+            jq \
+            ceph-common \
+            bash-completion; \
+          sudo mkdir -p /root/ansible; \
+          sudo touch /root/ansible/ansible.log \
+        "
+    - >
+      ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible \
+        ${BASTION_IP} "sudo pip install virtualenv ansible-core"
+    - >
+      ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible \
+        ${BASTION_IP} "\
+          git clone https://github.com/ceph/ceph-ansible.git; \
+          cd ceph-ansible; \
+          git checkout stable-7.0 \
+        "
+    - >
+      ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible \
+        ${BASTION_IP} "\
+          git clone https://github.com/kubernetes-sigs/kubespray.git; \
+          cd kubespray; \
+          cp -rfp inventory/sample inventory/mycluster \
+        "
+
+generate-inventory:
+  stage: generate-inventory
+  image: alpine
+  needs:
+    - job: configure-bastion
+    - job: apply
+      artifacts: true
+  before_script:
+    - cd ./kubernetes-project
+    - apk update; apk add gnupg jq openssh gettext
+    - >
+      echo ${ARTIFACT_ENCRYPTION_PASSPHRASE} | gpg \
+        --batch \
+        --always-trust \
+        --yes \
+        --passphrase-fd 0 \
+        -d \
+        -o ansible_rsa ./terraform/ansible_rsa.gpg
+    - >
+      echo ${ARTIFACT_ENCRYPTION_PASSPHRASE} | gpg \
+        --batch \
+        --always-trust \
+        --yes \
+        --passphrase-fd 0 \
+        -d \
+        -o outputs.json ./terraform/outputs.json.gpg
+    - chmod 0400 ansible_rsa
+    - >
+      export BASTION_IP=$( \
+        cat outputs.json | jq -r .bastion_public_ip.value \
+      )
+    - >
+      export PLATFORM_INGRESS_IP=$( \
+        cat outputs.json | jq -r .platform_ingress_ip.value \
+      )
+    - >
+      export WORKER1_IP=$( \
+        cat outputs.json | jq -r .worker_nodes_private_ips.value[0] \
+      )
+    - >
+      export WORKER2_IP=$( \
+        cat outputs.json | jq -r .worker_nodes_private_ips.value[1] \
+      )
+    - >
+      export WORKER3_IP=$( \
+        cat outputs.json | jq -r .worker_nodes_private_ips.value[2] \
+      )
+    - >
+      export MASTER1_IP=$( \
+        cat outputs.json | jq -r .master_nodes_private_ips.value[0] \
+      )
+    - >
+      export MASTER2_IP=$( \
+        cat outputs.json | jq -r .master_nodes_private_ips.value[1] \
+      )
+    - >
+      export MASTER3_IP=$( \
+        cat outputs.json | jq -r .master_nodes_private_ips.value[2] \
+      )
+  script:
+    - |
+      for i in 1 2 3 ; do
+        CEPH_IP=`cat outputs.json | jq -r .ceph${i}_private_ip.value`
+        sed -i "s/ceph${i}_ip/${CEPH_IP}/" ceph/inventory.ini
+      done
+    - >
+      scp -o 'StrictHostKeyChecking no' -i ansible_rsa \
+        ceph/inventory.ini \
+        ansible@${BASTION_IP}:/home/ansible/ceph-ansible/inventory.ini
+    - >
+      scp -o 'StrictHostKeyChecking no' -i ansible_rsa \
+        ceph/site.yml \
+        ansible@${BASTION_IP}:/home/ansible/ceph-ansible/site.yml
+    - >
+      scp -o 'StrictHostKeyChecking no' -i ansible_rsa \
+        ceph/all.yml \
+        ansible@${BASTION_IP}:/home/ansible/ceph-ansible/group_vars/all.yml
+    - > 
+      scp -o 'StrictHostKeyChecking no' -i ansible_rsa \
+        ceph/osds.yml \
+        ansible@${BASTION_IP}:/home/ansible/ceph-ansible/group_vars/osds.yml
+    - |
+      sed -i "s/master1_ip/${MASTER1_IP}/g" k8s/hosts.yaml
+      sed -i "s/master2_ip/${MASTER2_IP}/g" k8s/hosts.yaml
+      sed -i "s/master3_ip/${MASTER3_IP}/g" k8s/hosts.yaml     
+      sed -i "s/worker1_ip/${WORKER1_IP}/g" k8s/hosts.yaml
+      sed -i "s/worker2_ip/${WORKER2_IP}/g" k8s/hosts.yaml
+      sed -i "s/worker3_ip/${WORKER3_IP}/g" k8s/hosts.yaml        
+    - |  
+      envsubst '$SELECTEL_API_TOKEN' < argocd/selectel-api-token.yml.template \
+        > argocd/selectel-api-token.yml
+      envsubst '$ARGOCD_ADMIN_PASSWORD' < k8s/addons.yml.template \
+        > k8s/addons.yml
+      envsubst '$PLATFORM_INGRESS_IP' < k8s/k8s-cluster.yml.template \
+        > k8s/k8s-cluster.yml
+    - |
+      scp -o "StrictHostKeyChecking no" -i ansible_rsa \
+        k8s/hosts.yaml \
+        ansible@${BASTION_IP}:~/kubespray/inventory/mycluster/hosts.yaml
+    - |
+      scp -o "StrictHostKeyChecking no" -i ansible_rsa \
+        k8s/addons.yml \
+        ansible@${BASTION_IP}:~/kubespray/inventory/mycluster/group_vars/k8s_cluster/addons.yml
+    - |
+      scp -o "StrictHostKeyChecking no" -i ansible_rsa \
+        k8s/all.yml \
+        ansible@${BASTION_IP}:~/kubespray/inventory/mycluster/group_vars/all/all.yml
+    - |
+      scp -o "StrictHostKeyChecking no" -i ansible_rsa \
+        k8s/k8s-cluster.yml \
+        ansible@${BASTION_IP}:~/kubespray/inventory/mycluster/group_vars/k8s_cluster/k8s-cluster.yml
+    - |
+      envsubst '$SELECTEL_API_TOKEN' < argocd/selectel-api-token.yml.template \
+        > argocd/selectel-api-token.yml
+      envsubst '$CEPH_ADMIN_KEY'     < argocd/ceph/secret.yaml.template \
+        > argocd/ceph/secret.yaml
+      scp -r -o "StrictHostKeyChecking no" -i ansible_rsa \
+        argocd \
+        ansible@${BASTION_IP}:~/argocd
+
+deploy-ceph:
+  stage: deploy
+  image: alpine
+  needs:
+    - job: generate-inventory
+    - job: apply
+      artifacts: true
+  before_script:
+    - |
+      cd ./kubernetes-project
+      apk update; apk add gnupg jq openssh
+      echo ${ARTIFACT_ENCRYPTION_PASSPHRASE} | gpg \
+        --batch \
+        --always-trust \
+        --yes \
+        --passphrase-fd 0 \
+        -d \
+        -o ansible_rsa ./terraform/ansible_rsa.gpg
+      echo ${ARTIFACT_ENCRYPTION_PASSPHRASE} | gpg \
+        --batch \
+        --always-trust \
+        --yes \
+        --passphrase-fd 0 \
+        -d \
+        -o outputs.json ./terraform/outputs.json.gpg
+      chmod 0400 ansible_rsa
+      export WORKER1_IP=$(cat outputs.json | jq -r .worker_nodes_private_ips.value[0])
+      export WORKER2_IP=$(cat outputs.json | jq -r .worker_nodes_private_ips.value[1])
+      export WORKER3_IP=$(cat outputs.json | jq -r .worker_nodes_private_ips.value[2])
+      export BASTION_IP=$(cat outputs.json | jq -r .bastion_public_ip.value)
+    - scp -o 'StrictHostKeyChecking no' -i ansible_rsa ./ceph/extra_fstab ansible@${BASTION_IP}:~/
+  script:
+    - |
+      ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible \
+      ${BASTION_IP} <<ENDSSH
+        cd ~/ceph-ansible
+        sudo virtualenv ../ceph-ansible
+        source bin/activate
+        sudo pip install -r requirements.txt
+        sudo -H pip install -Iv 'resolvelib<0.6.0'
+        sudo ansible-galaxy install -r requirements.yml
+        sudo ansible-playbook -i inventory.ini ./site.yml
+        deactivate
+      ENDSSH
+      sleep 30  
+    - ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} "ssh -o 'StrictHostKeyChecking no' ceph1.ru-central1.internal 'sudo ceph config set mon auth_allow_insecure_global_id_reclaim false'"
+    - ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} "ssh -o 'StrictHostKeyChecking no' ceph1.ru-central1.internal 'sudo ceph fs subvolumegroup create cephfs csi'"
+    - ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} "sudo mkdir -p -m 755 /etc/ceph; sudo mkdir -p /mnt/mycephfs"
+    - ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} "ssh -o 'StrictHostKeyChecking no' ceph1.ru-central1.internal 'sudo ceph config generate-minimal-conf' | sudo tee /etc/ceph/ceph.conf"
+    - ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} "ssh -o 'StrictHostKeyChecking no' ceph1.ru-central1.internal 'sudo ceph fs authorize cephfs client.kube / rw' | sudo tee /etc/ceph/ceph.client.kube.keyring"
+    - ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} "ssh -o 'StrictHostKeyChecking no' ceph1.ru-central1.internal 'sudo ceph auth get-key client.kube' | sudo tee /etc/ceph/kube.key"
+    - ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} "sudo chmod 644 /etc/ceph/ceph.conf; sudo chmod 644 /etc/ceph/ceph.client.kube.keyring; sudo chmod 644 /etc/ceph/kube.key"
+    - |
+      export CEPH_FSID=$( \
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible \
+        ${BASTION_IP} "ssh -o 'StrictHostKeyChecking no' -i /home/ansible/.ssh/id_rsa ansible@ceph1.ru-central1.internal 'sudo ceph fsid'" \
+      )
+      echo "CEPH_FSID=$CEPH_FSID"
+    - |
+      export CEPH_ADMIN_KEY=$( \
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible \
+        ${BASTION_IP} "ssh -o 'StrictHostKeyChecking no' -i /home/ansible/.ssh/id_rsa ansible@ceph1.ru-central1.internal \
+        'sudo ceph auth get client.admin'" | grep 'key =' | awk '{ print $3 }' \
+      )
+    - |
+      export CEPH_KUBE_KEY=$( \
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible \
+        ${BASTION_IP} "ssh -o 'StrictHostKeyChecking no' -i /home/ansible/.ssh/id_rsa ansible@ceph1.ru-central1.internal \
+        'sudo ceph auth get-key client.kube'" \
+      )
+    - ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} "ls -lA"
+    - ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} "cat ~/extra_fstab | sudo tee -a /etc/fstab"
+    - ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} "sudo mount /mnt/mycephfs"
+    - ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} "df -h"
+    - |
+      for WORKER in worker1.ru-central1.internal \
+                    worker2.ru-central1.internal \
+                    worker3.ru-central1.internal; do
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} WORKER=${WORKER} "ssh -T -o 'StrictHostKeyChecking no' ${WORKER} 'sudo apt-get -y update && sudo DEBIAN_FRONTEND=noninteractive apt-get -y install ceph-common'"
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} WORKER=${WORKER} "ssh -T -o 'StrictHostKeyChecking no' ${WORKER} 'mkdir -p ceph; sudo mkdir -p /etc/ceph; sudo mkdir -p /mnt/mycephfs'"
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} WORKER=${WORKER} "scp -r -o 'StrictHostKeyChecking no' /etc/ceph/*   ${WORKER}:~/ceph/"
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} WORKER=${WORKER} "scp    -o 'StrictHostKeyChecking no' ~/extra_fstab ${WORKER}:~/ceph/"
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} WORKER=${WORKER} "ssh -T -o 'StrictHostKeyChecking no' ${WORKER} 'sudo cp -r ceph/* /etc/ceph/'"
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} WORKER=${WORKER} "ssh -T -o 'StrictHostKeyChecking no' ${WORKER} 'cat ~/ceph/extra_fstab | sudo tee -a /etc/fstab'"
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} WORKER=${WORKER} "ssh -T -o 'StrictHostKeyChecking no' ${WORKER} 'sudo mount /mnt/mycephfs'"
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible ${BASTION_IP} WORKER=${WORKER} "ssh -T -o 'StrictHostKeyChecking no' ${WORKER} 'df -h'"
+      done
+
+deploy-k8s:
+  stage: deploy
+  image: alpine
+  needs:
+    - job: generate-inventory
+    - job: deploy-ceph
+    - job: apply
+      artifacts: true
+  before_script:
+    - cd ./kubernetes-project
+    - apk update; apk add gnupg jq openssh
+    - |
+      echo ${ARTIFACT_ENCRYPTION_PASSPHRASE} | gpg \
+        --batch \
+        --always-trust \
+        --yes \
+        --passphrase-fd 0 \
+        -d \
+        -o ansible_rsa  ./terraform/ansible_rsa.gpg
+    - |
+      echo ${ARTIFACT_ENCRYPTION_PASSPHRASE} | gpg \
+        --batch \
+        --always-trust \
+        --yes \
+        --passphrase-fd 0 \
+        -d \
+        -o outputs.json ./terraform/outputs.json.gpg
+    - chmod 0400 ansible_rsa
+    - export BASTION_IP=$(cat outputs.json | jq -r .bastion_public_ip.value)
+  script:
+    - |
+      ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible \
+      ${BASTION_IP} <<ENDSSH
+        cd ~/kubespray
+        sudo virtualenv ../kubespray
+        source bin/activate
+        sudo pip install -r requirements.txt
+        sudo ansible-playbook \
+          -i inventory/mycluster/hosts.yaml \
+          --become \
+          --become-user=root \
+          --user=ansible \
+          --key-file=/home/ansible/.ssh/id_rsa \
+          cluster.yml
+        deactivate
+      ENDSSH
+    - |
+      ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible \
+      ${BASTION_IP} <<ENDSSH
+        mkdir ~/.kube
+        sudo cp ~/kubespray/inventory/mycluster/artifacts/admin.conf ~/.kube/config
+        sudo cp ~/kubespray/inventory/mycluster/artifacts/kubectl    /usr/local/bin/
+        sudo chown ansible:ansible ~/.kube/config
+        echo 'source <(kubectl completion bash)' >> ~/.bashrc
+        echo 'alias k=kubectl' >> ~/.bashrc
+        echo 'complete -o default -F __start_kubectl k' >> ~/.bashrc
+      ENDSSH
+    - >
+      ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible \
+        ${BASTION_IP} "kubectl get nodes"
+
+kickstart-gitops:
+  stage: gitops
+  image: alpine
+  needs:
+    - job: generate-inventory
+    - job: deploy-ceph
+    - job: apply
+    - job: deploy-k8s
+      artifacts: true
+  before_script:
+    - cd ./kubernetes-project
+    - apk update; apk add gnupg jq openssh gettext
+    - |
+      echo ${ARTIFACT_ENCRYPTION_PASSPHRASE} | gpg \
+        --batch \
+        --always-trust \
+        --yes \
+        --passphrase-fd 0 \
+        -d \
+        -o ansible_rsa  ./terraform/ansible_rsa.gpg
+    - |
+      echo ${ARTIFACT_ENCRYPTION_PASSPHRASE} | gpg \
+        --batch \
+        --always-trust \
+        --yes \
+        --passphrase-fd 0 \
+        -d \
+        -o outputs.json ./terraform/outputs.json.gpg
+    - chmod 0400 ansible_rsa
+    - export BASTION_IP=$(cat outputs.json | jq -r .bastion_public_ip.value)
+    - >
+      export CEPH_FSID=$( \
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible \
+        ${BASTION_IP} "ssh -o 'StrictHostKeyChecking no' -i /home/ansible/.ssh/id_rsa ansible@ceph1.ru-central1.internal 'sudo ceph fsid'" \
+      )
+    - >
+      export CEPH_ADMIN_KEY=$( \
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible \
+        ${BASTION_IP} \
+        "ssh -o 'StrictHostKeyChecking no' -i /home/ansible/.ssh/id_rsa ansible@ceph1.ru-central1.internal 'sudo ceph auth get client.admin'" | \
+        grep 'key = ' | awk '{ print $3 }' \
+      )
+    - >
+      export CEPH_KUBE_KEY=$( \
+        ssh -T -o 'StrictHostKeyChecking no' -i ansible_rsa -l ansible \
+        ${BASTION_IP} \
+        "ssh -o 'StrictHostKeyChecking no' -i /home/ansible/.ssh/id_rsa ansible@ceph1.ru-central1.internal 'sudo ceph auth get-key client.kube'" \
+      )
+  script:
+    - |
+      envsubst '$CEPH_FSID'      < argocd/ceph/ceph.yaml.template \
+        > argocd/ceph/ceph.yaml
+      envsubst '$CEPH_ADMIN_KEY' < argocd/ceph/secret.yaml.template \
+        > argocd/ceph/secret.yaml
+      envsubst '$CEPH_FSID'      < argocd/ceph/storageclass.yaml.template \
+        > argocd/ceph/storageclass.yaml
+      scp -o "StrictHostKeyChecking no" -i ansible_rsa \
+        argocd/ceph/ceph.yaml \
+        ansible@${BASTION_IP}:~/argocd/ceph/ceph.yaml
+      scp -o "StrictHostKeyChecking no" -i ansible_rsa \
+        argocd/ceph/secret.yaml \
+        ansible@${BASTION_IP}:~/argocd/ceph/secret.yaml
+      scp -o "StrictHostKeyChecking no" -i ansible_rsa \
+        argocd/ceph/storageclass.yaml \
+        ansible@${BASTION_IP}:~/argocd/ceph/storageclass.yaml
+      ssh -T -o "StrictHostKeyChecking no" -i ansible_rsa -l ansible \
+      ${BASTION_IP} <<ENDSSH
+        kubectl apply -f ~/argocd/root-projects.yaml 
+        kubectl apply -f ~/argocd/root-applications.yaml
+        kubectl apply -f ~/argocd/selectel-api-token.yml
+        kubectl -n argocd patch cm argocd-cmd-params-cm --patch-file ~/argocd/argo-patch.yaml
+        kubectl -n argocd scale deployment argocd-server --replicas=0
+        sleep 5
+        kubectl -n argocd scale deployment argocd-server --replicas=1
+        sleep 30
+        kubectl apply -f ~/argocd/ceph/ceph.yaml
+        kubectl create ns ceph-csi-cephfs
+        kubectl apply -f ~/argocd/ceph/secret.yaml
+        kubectl apply -f ~/argocd/ceph/storageclass.yaml       
+      ENDSSH
